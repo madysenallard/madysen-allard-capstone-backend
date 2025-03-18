@@ -1,84 +1,108 @@
 import express from "express";
 import axios from "axios";
-import cors from "cors";
 import dotenv from "dotenv";
 import photos from "./routes/photos.js";
+import cors from "cors";
 
 dotenv.config();
 const app = express();
 
-app.use(express.static("public"));
-
 app.use(cors());
 app.use(express.json());
-//mounting all photos routes
+// Mounting all photos routes
 app.use("/api/photos", photos);
 
 const PORT = process.env.PORT || 5050;
-const STORMGLASS_API_KEY = process.env.STORMGLASS_API_KEY;
-const OPENWEATHER_API_KEY = process.env.OPENWEATHER_API_KEY;
+const googleApiKey = process.env.GOOGLE_MAPS_API_KEY;
 
-//fetch coordinates for a city
-app.get("/location", async (req, res) => {
-  const { city } = req.query;
-  try {
-    const response = await axios.get(
-      `http://api.openweathermap.org/geo/1.0/direct?q=${city}&limit=1&appid=${OPENWEATHER_API_KEY}`
-    );
-    if (response.data.length === 0) {
-      return res.status(404).json({ error: "City not found" });
-    }
-    const { lat, lon } = response.data[0];
-    res.json({ lat, lon });
-  } catch (error) {
-    res.status(500).json({ error: "Error fetching location" });
+// Nearby beaches endpoint (updated for new Google Places API)
+app.get("/api/nearby-beaches", async (req, res) => {
+  const { lat, lng, radius = 10000 } = req.query;
+
+  // Validate query parameters
+  if (!lat || !lng) {
+    return res
+      .status(400)
+      .json({ error: "Latitude and longitude are required" });
   }
-});
 
-//fetch surf conditions
-app.get("/surf-conditions", async (req, res) => {
-  const { lat, lon } = req.query;
   try {
-    const weatherResp = await axios.get(
-      `https://api.openweathermap.org/data/3.0/onecall?lat=${lat}&lon=${lon}&exclude=minutely,alerts&appid=${OPENWEATHER_API_KEY}&units=metric`
-    );
-
-    const stormglassResp = await axios.get(
-      "https://api.stormglass.io/v2/weather/point",
+    // Make a POST request to the new Google Places API
+    const response = await axios.post(
+      `https://places.googleapis.com/v1/places:searchNearby`,
       {
-        params: {
-          lat,
-          lon,
-          params:
-            "waveHeight,wavePeriod,waveDirection,windDirection,windSpeed,waterTemperature",
-          source: "noaa",
-          start: Math.floor(Date.now() / 1000),
+        includedTypes: ["beach"],
+        maxResultCount: 10,
+        locationRestriction: {
+          circle: {
+            center: { latitude: parseFloat(lat), longitude: parseFloat(lng) },
+            radius: parseFloat(radius),
+          },
         },
+      },
+      {
         headers: {
-          Authorization: STORMGLASS_API_KEY,
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": googleApiKey,
+          "X-Goog-FieldMask":
+            "places.displayName,places.formattedAddress,places.location",
         },
       }
     );
 
-    res.json({
-      temp_air: weatherResp.data.current.temp,
-      wind_speed: weatherResp.data.current.wind_speed,
-      wind_direction: weatherResp.data.current.wind_deg,
-      wave_height: stormglassResp.data.hours[0].waveHeight.noaa,
-    });
+    // Process the response
+    const beaches = response.data.places.map((place) => ({
+      name: place.displayName.text,
+      lat: place.location.latitude,
+      lng: place.location.longitude,
+    }));
+
+    // Send the response back to the frontend
+    res.json({ results: beaches });
   } catch (error) {
-    console.error(
-      "Stormglass API error:",
-      error.response?.data || error.message
-    );
-    res.status(500).json({ error: "Error fetching surf conditions" });
+    console.error("Error fetching nearby beaches:", error);
+    res.status(500).json({ error: "Failed to fetch nearby beaches" });
   }
 });
 
-// app.get("/", (req, res) => {
-//   res.send(`<h1>Welcome to my Express App</h1>`);
-// });
+// Geocoding endpoint (unchanged)
+app.get("/api/geocode", async (req, res) => {
+  const { city } = req.query;
 
+  // Validate query parameters
+  if (!city) {
+    return res.status(400).json({ error: "City name is required" });
+  }
+
+  try {
+    const response = await axios.get(
+      `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
+        city
+      )}&key=${googleApiKey}`
+    );
+
+    // Check if the Geocoding API returned an error
+    if (
+      response.data.status === "REQUEST_DENIED" ||
+      response.data.status === "INVALID_REQUEST"
+    ) {
+      console.error("Google Geocoding API Error:", response.data);
+      return res.status(400).json({
+        error:
+          response.data.error_message ||
+          "Invalid request to Google Geocoding API",
+      });
+    }
+
+    // Send the response back to the frontend
+    res.json(response.data);
+  } catch (error) {
+    console.error("Error fetching geocoding data:", error);
+    res.status(500).json({ error: "Failed to fetch geocoding data" });
+  }
+});
+
+// Start the server
 app.listen(PORT, () => {
-  console.log(`app running on port ${PORT}`);
+  console.log(`Server is running on http://localhost:${PORT}`);
 });
