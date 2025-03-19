@@ -1,5 +1,8 @@
 import jwt from "jsonwebtoken";
-import { knex } from "../routes/auth.js";
+import knex from "knex";
+import config from "../knexfile.js";
+
+const db = knex(config);
 
 async function authorize(req, res, next) {
   const { authorization } = req.headers;
@@ -22,7 +25,7 @@ async function authorize(req, res, next) {
     const { id } = payload;
 
     // Find the user in the database
-    const user = await knex("users")
+    const user = await db("users")
       .select("id", "username", "email")
       .where({ id })
       .first();

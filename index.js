@@ -9,6 +9,8 @@ import geocode from "./routes/geocode.js";
 import initKnex from "knex";
 import configuration from "./knexfile.js";
 import errorHandler from "./middleware/errorHandler.js";
+import path from "path";
+import { fileURLToPath } from "url";
 
 dotenv.config();
 
@@ -22,10 +24,12 @@ if (!process.env.GOOGLE_MAPS_API_KEY) {
 
 const app = express();
 const PORT = process.env.PORT || 5050;
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // Routes
 app.use("/api/photos", photos);
