@@ -2,18 +2,21 @@ import express from "express";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import authorize from "../middleware/authorize.js";
+import knex from "knex";
+import config from "../knexfile.js";
 
+const db = knex(config);
 const router = express.Router();
 
 router.post("/register", async (req, res) => {
-  const { username, email, password } = req.body;
-  console.log({ username, email, password });
+  const { username, password } = req.body;
+  console.log({ username, password });
 
   const encrypted = bcrypt.hashSync(password);
   console.log(password, encrypted);
 
   try {
-    await knex("users").insert({ username, email, password: encrypted });
+    await db("users").insert({ username, password: encrypted });
     res.status(201).json({ success: true });
   } catch (e) {
     switch (e.code) {
@@ -33,7 +36,7 @@ router.post("/login", async (req, res) => {
   const { username, password } = req.body;
 
   try {
-    const user = await knex("users").where({ username }).first();
+    const user = await db("users").where({ username }).first();
 
     if (!user) {
       return res.status(400).send("user incorrect");

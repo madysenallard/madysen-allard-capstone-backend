@@ -7,12 +7,10 @@ export async function seed(knex) {
     {
       username: "admin",
       password: bcrypt.hashSync("admin123"),
-      likes: 10,
     },
     {
       username: "user1",
       password: bcrypt.hashSync("password123"),
-      likes: 5,
     },
   ]);
 }

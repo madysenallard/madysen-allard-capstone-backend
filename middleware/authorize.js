@@ -26,7 +26,7 @@ async function authorize(req, res, next) {
 
     // Find the user in the database
     const user = await db("users")
-      .select("id", "username", "email")
+      .select("id", "username")
       .where({ id })
       .first();
 
