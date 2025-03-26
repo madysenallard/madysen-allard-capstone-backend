@@ -67,10 +67,10 @@ router.post("/", authorize, upload.single("photo"), async (req, res) => {
       username: username,
       photo_url: `http://localhost:8080/uploads/${photo.filename}`,
       caption,
-      timestamp: new Date(photoData.timestamp),
+      timestamp: new Date(),
     };
 
-    photos.push(newPhoto);
+    photos.unshift(newPhoto);
 
     writePhotos(photos);
 
